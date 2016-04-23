@@ -67,6 +67,21 @@ test('Munge SDP sample', function(t) {
   })
   .then(function() {
     t.pass('remotePeerConnection ICE connected');
+    // Need to make sure some data has had time to transfer.
+    return driver.wait(function() {
+      return driver.executeScript(
+        'return typeof dataChannelDataReceived !== \'undefined\';');
+    });
+  })
+  .then(function() {
+    return driver.executeScript(
+        'return dataChannelDataReceived;');
+  })
+  .then(function(value) {
+    t.ok(value !== '', 'dataChannelDataReceived is not empty.');
+  })
+  .then(function() {
+    t.pass('remotePeerConnection ICE connected');
     t.end();
   })
   .then(null, function(err) {

@@ -46,11 +46,9 @@ remoteVideo.onresize = function() {
 var localStream;
 var pc1;
 var pc2;
-var sdpConstraints = {
-  'mandatory': {
-    'OfferToReceiveAudio': true,
-    'OfferToReceiveVideo': true
-  }
+var offerOptions = {
+  offerToReceiveAudio: 1,
+  offerToReceiveVideo: 1
 };
 
 function getName(pc) {
@@ -63,8 +61,7 @@ function getOtherPc(pc) {
 
 function gotStream(stream) {
   trace('Received local stream');
-  // Call the polyfill wrapper to attach the media stream to this element.
-  attachMediaStream(localVideo, stream);
+  localVideo.srcObject = stream;
   localStream = stream;
   callButton.disabled = false;
 }
@@ -118,7 +115,8 @@ function call() {
   trace('Added local stream to pc1');
 
   trace('pc1 createOffer start');
-  pc1.createOffer(onCreateOfferSuccess, onCreateSessionDescriptionError);
+  pc1.createOffer(onCreateOfferSuccess, onCreateSessionDescriptionError,
+      offerOptions);
 }
 
 function onCreateSessionDescriptionError(error) {
@@ -139,8 +137,7 @@ function onCreateOfferSuccess(desc) {
   // Since the 'remote' side has no media stream we need
   // to pass in the right constraints in order for it to
   // accept the incoming offer of audio and video.
-  pc2.createAnswer(onCreateAnswerSuccess, onCreateSessionDescriptionError,
-      sdpConstraints);
+  pc2.createAnswer(onCreateAnswerSuccess, onCreateSessionDescriptionError);
 }
 
 function onSetLocalSuccess(pc) {
@@ -156,8 +153,7 @@ function onSetSessionDescriptionError(error) {
 }
 
 function gotRemoteStream(e) {
-  // Call the polyfill wrapper to attach the media stream to this element.
-  attachMediaStream(remoteVideo, e.stream);
+  remoteVideo.srcObject = e.stream;
   trace('pc2 received remote stream');
 }
 

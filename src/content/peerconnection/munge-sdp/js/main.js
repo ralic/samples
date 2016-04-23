@@ -16,6 +16,7 @@ var setOfferButton = document.querySelector('button#setOffer');
 var createAnswerButton = document.querySelector('button#createAnswer');
 var setAnswerButton = document.querySelector('button#setAnswer');
 var hangupButton = document.querySelector('button#hangup');
+var dataChannelDataReceived;
 
 getMediaButton.onclick = getMedia;
 createPeerConnectionButton.onclick = createPeerConnection;
@@ -43,11 +44,16 @@ var selectSourceDiv = document.querySelector('div#selectSource');
 var localPeerConnection;
 var remotePeerConnection;
 var localStream;
-var sdpConstraints = {
-  'mandatory': {
-    'OfferToReceiveAudio': true,
-    'OfferToReceiveVideo': true
-  }
+var sendChannel;
+var receiveChannel;
+var dataChannelOptions = {
+  ordered: true
+};
+var dataChannelCounter = 0;
+var sendDataLoop;
+var offerOptions = {
+  offerToReceiveAudio: 1,
+  offerToReceiveVideo: 1
 };
 
 getSources();
@@ -93,7 +99,7 @@ function getMedia() {
 
   if (localStream) {
     localVideo.src = null;
-    localStream.stop();
+    localStream.getTracks().forEach(function(track) { track.stop(); });
   }
   var audioSource = audioSelect.value;
   trace('Selected audio source: ' + audioSource);
@@ -122,8 +128,7 @@ function getMedia() {
 
 function gotStream(stream) {
   trace('Received local stream');
-  // Call the polyfill wrapper to attach the media stream to this element.
-  attachMediaStream(localVideo, stream);
+  localVideo.srcObject = stream;
   localStream = stream;
 }
 
@@ -144,13 +149,21 @@ function createPeerConnection() {
     trace('Using audio device: ' + audioTracks[0].label);
   }
   var servers = null;
+
   localPeerConnection = new RTCPeerConnection(servers);
   trace('Created local peer connection object localPeerConnection');
+  sendChannel = localPeerConnection.createDataChannel('sendDataChannel',
+      dataChannelOptions);
   localPeerConnection.onicecandidate = iceCallback1;
+  sendChannel.onopen = onSendChannelStateChange;
+  sendChannel.onclose = onSendChannelStateChange;
+  sendChannel.onerror = onSendChannelStateChange;
+
   remotePeerConnection = new RTCPeerConnection(servers);
   trace('Created remote peer connection object remotePeerConnection');
   remotePeerConnection.onicecandidate = iceCallback2;
   remotePeerConnection.onaddstream = gotRemoteStream;
+  remotePeerConnection.ondatachannel = receiveChannelCallback;
 
   localPeerConnection.addStream(localStream);
   trace('Adding Local Stream to peer connection');
@@ -175,7 +188,7 @@ function maybeAddLineBreakToEnd(sdp) {
 
 function createOffer() {
   localPeerConnection.createOffer(gotDescription1,
-      onCreateSessionDescriptionError);
+      onCreateSessionDescriptionError, offerOptions);
 }
 
 function onCreateSessionDescriptionError(error) {
@@ -186,7 +199,7 @@ function setOffer() {
   var sdp = offerSdpTextarea.value;
   sdp = maybeAddLineBreakToEnd(sdp);
   sdp = sdp.replace(/\n/g, '\r\n');
-  offer.ѕdp = sdp;
+  offer.sdp = sdp;
   localPeerConnection.setLocalDescription(offer,
       onSetSessionDescriptionSuccess,
       onSetSessionDescriptionError);
@@ -207,8 +220,7 @@ function createAnswer() {
   // to pass in the right constraints in order for it to
   // accept the incoming offer of audio and video.
   remotePeerConnection.createAnswer(gotDescription2,
-      onCreateSessionDescriptionError,
-      sdpConstraints);
+      onCreateSessionDescriptionError);
 }
 
 function setAnswer() {
@@ -231,10 +243,18 @@ function gotDescription2(description) {
   answerSdpTextarea.value = description.sdp;
 }
 
+function sendData() {
+  sendChannel.send(dataChannelCounter);
+  trace('DataChannel send counter: ' + dataChannelCounter);
+  dataChannelCounter++;
+}
+
 function hangup() {
   remoteVideo.src = '';
   trace('Ending call');
-  //  localStream.stop();
+  localStream.getTracks().forEach(function(track) { track.stop(); });
+  sendChannel.close();
+  receiveChannel.close();
   localPeerConnection.close();
   remotePeerConnection.close();
   localPeerConnection = null;
@@ -251,8 +271,7 @@ function hangup() {
 }
 
 function gotRemoteStream(e) {
-  // Call the polyfill wrapper to attach the media stream to this element.
-  attachMediaStream(remoteVideo, e.stream);
+  remoteVideo.srcObject = e.stream;
   trace('Received remote stream');
 }
 
@@ -278,4 +297,32 @@ function onAddIceCandidateSuccess() {
 
 function onAddIceCandidateError(error) {
   trace('Failed to add Ice Candidate: ' + error.toString());
+}
+
+function receiveChannelCallback(event) {
+  trace('Receive Channel Callback');
+  receiveChannel = event.channel;
+  receiveChannel.onmessage = onReceiveMessageCallback;
+  receiveChannel.onopen = onReceiveChannelStateChange;
+  receiveChannel.onclose = onReceiveChannelStateChange;
+}
+
+function onReceiveMessageCallback(event) {
+  dataChannelDataReceived = event.data;
+  trace('DataChannel receive counter: ' + dataChannelDataReceived);
+}
+
+function onSendChannelStateChange() {
+  var readyState = sendChannel.readyState;
+  trace('Send channel state is: ' + readyState);
+  if (readyState === 'open') {
+    sendDataLoop = setInterval(sendData, 1000);
+  } else {
+    clearInterval(sendDataLoop);
+  }
+}
+
+function onReceiveChannelStateChange() {
+  var readyState = receiveChannel.readyState;
+  trace('Receive channel state is: ' + readyState);
 }

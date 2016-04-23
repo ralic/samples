@@ -25,17 +25,14 @@ var pc1Local;
 var pc1Remote;
 var pc2Local;
 var pc2Remote;
-var sdpConstraints = {
-  'mandatory': {
-    'OfferToReceiveAudio': true,
-    'OfferToReceiveVideo': true
-  }
+var offerOptions = {
+  offerToReceiveAudio: 1,
+  offerToReceiveVideo: 1
 };
 
 function gotStream(stream) {
   trace('Received local stream');
-  // Call the polyfill (adapter.js) to attach the media stream to this element.
-  attachMediaStream(video1, stream);
+  video1.srcObject = stream;
   window.localstream = stream;
   callButton.disabled = false;
 }
@@ -83,11 +80,13 @@ function call() {
 
   pc1Local.addStream(window.localstream);
   trace('Adding local stream to pc1Local');
-  pc1Local.createOffer(gotDescription1Local, onCreateSessionDescriptionError);
+  pc1Local.createOffer(gotDescription1Local, onCreateSessionDescriptionError,
+      offerOptions);
 
   pc2Local.addStream(window.localstream);
   trace('Adding local stream to pc2Local');
-  pc2Local.createOffer(gotDescription2Local, onCreateSessionDescriptionError);
+  pc2Local.createOffer(gotDescription2Local, onCreateSessionDescriptionError,
+      offerOptions);
 }
 
 function onCreateSessionDescriptionError(error) {
@@ -102,7 +101,7 @@ function gotDescription1Local(desc) {
   // to pass in the right constraints in order for it to
   // accept the incoming offer of audio and video.
   pc1Remote.createAnswer(gotDescription1Remote,
-      onCreateSessionDescriptionError, sdpConstraints);
+      onCreateSessionDescriptionError);
 }
 
 function gotDescription1Remote(desc) {
@@ -119,7 +118,7 @@ function gotDescription2Local(desc) {
   // to pass in the right constraints in order for it to
   // accept the incoming offer of audio and video.
   pc2Remote.createAnswer(gotDescription2Remote,
-      onCreateSessionDescriptionError, sdpConstraints);
+      onCreateSessionDescriptionError);
 }
 
 function gotDescription2Remote(desc) {
@@ -141,14 +140,12 @@ function hangup() {
 }
 
 function gotRemoteStream1(e) {
-  // Call the polyfill wrapper to attach the media stream to this element.
-  attachMediaStream(video2, e.stream);
+  video2.srcObject = e.stream;
   trace('pc1: received remote stream');
 }
 
 function gotRemoteStream2(e) {
-  // Call the polyfill wrapper to attach the media stream to this element.
-  attachMediaStream(video3, e.stream);
+  video3.srcObject = e.stream;
   trace('pc2: received remote stream');
 }
 

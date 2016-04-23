@@ -30,17 +30,14 @@ var localstream;
 var pc1;
 var pc2;
 
-var sdpConstraints = {
-  mandatory: {
-    OfferToReceiveAudio: true,
-    OfferToReceiveVideo: true
-  }
+var offerOptions = {
+  offerToReceiveAudio: 1,
+  offerToReceiveVideo: 1
 };
 
 function gotStream(stream) {
   trace('Received local stream');
-  // Call the polyfill wrapper to attach the media stream to this element.
-  attachMediaStream(video1, stream);
+  video1.srcObject = stream;
   localstream = stream;
   callButton.disabled = false;
 }
@@ -95,7 +92,8 @@ function call() {
   pc2.onaddstream = gotRemoteStream;
   pc1.addStream(localstream);
   trace('Adding Local Stream to peer connection');
-  pc1.createOffer(gotDescription1, onCreateSessionDescriptionError);
+  pc1.createOffer(gotDescription1, onCreateSessionDescriptionError,
+      offerOptions);
 }
 
 function onCreateSessionDescriptionError(error) {
@@ -106,8 +104,7 @@ function gotDescription1(description) {
   pc1.setLocalDescription(description);
   trace('Offer from pc1: \n' + description.sdp);
   pc2.setRemoteDescription(description);
-  pc2.createAnswer(gotDescription2, onCreateSessionDescriptionError,
-      sdpConstraints);
+  pc2.createAnswer(gotDescription2, onCreateSessionDescriptionError);
 }
 
 function gotDescription2(description) {
@@ -131,7 +128,7 @@ function hangup() {
 }
 
 function gotRemoteStream(e) {
-  attachMediaStream(video2, e.stream);
+  video2.srcObject = e.stream;
   trace('Got remote stream');
 }
 
